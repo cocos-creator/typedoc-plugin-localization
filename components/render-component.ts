@@ -8,6 +8,12 @@ import { Constants } from '../utils/constants';
 import { RendererEvent } from 'typedoc/dist/lib/output/events';
 import { Parser } from '../utils/parser';
 
+interface localization {
+    chooseTag: string,
+    removeTags: string[]
+}
+const availableLanguages = ['zh', 'en'];
+
 @Component({ name: 'render-component'})
 export class RenderComponenet extends RendererComponent {
     fileOperations: FileOperations;
@@ -28,11 +34,15 @@ export class RenderComponenet extends RendererComponent {
      */
     parser: Parser;
 
+    /**
+     * Localizing docs language
+     */
+    customLocalization: localization
+
     public initialize() {
         this.listenTo(this.owner, {
             [RendererEvent.BEGIN]: this.onRenderBegin,
         });
-        
         this.fileOperations = new FileOperations(this.application.logger);
         this.parser = new Parser();
     }
@@ -43,6 +53,19 @@ export class RenderComponenet extends RendererComponent {
         const reflections = event.project.reflections;
         const options = this.application.options.getRawValues();
         const localizeOpt = options[Constants.RENDER_OPTION];
+        if (!options.localize) {
+            this.customLocalization = undefined;
+            return;
+        }
+        else {
+            let languageList = availableLanguages;
+            let chooseTag = languageList.splice(availableLanguages.indexOf(options.localize), 1);
+            let removeTags = languageList;
+            this.customLocalization = {
+                chooseTag: chooseTag[0],
+                removeTags: removeTags
+            };
+        }
         if (localizeOpt) {
             this.mainDirOfJsons = localizeOpt;
             this.globalFuncsData = this.fileOperations.getFileData(this.mainDirOfJsons, Constants.GLOBAL_FUNCS_FILE_NAME, 'json');
@@ -55,6 +78,14 @@ export class RenderComponenet extends RendererComponent {
         keys.forEach(key => {
             const reflection = reflections[key];
             this.processTheReflection(reflection);
+        });
+
+        keys.forEach(key => {
+            const reflection = reflections[key];
+            // 修正 enum 重名问题的命名重调整，保证最终 enum 名称正确。
+            if (reflection.kind === ReflectionKind.Enum) reflection.name = reflection.name.split('_')[0];
+            // external 名称缩减，美化 global 页面。这里只是简单的处理，主要是为了避免多 fork 一个 default-theme 仓库，建议后期修正。
+            if (reflection.parent && reflection.parent.name) reflection.parent.name = path.parse(reflection.parent.name.match(/[a-zA-Z0-9\/\\]/g).join('')).name;
         });
     }
 
@@ -151,12 +182,34 @@ export class RenderComponenet extends RendererComponent {
             parsed = this.parser.joinByCharacter(dataObj[Constants.COMMENT][Constants.SHORT_TEXT], '\n');
             reflection.comment.shortText = parsed;
         }
-
+        // @ts-ignore
         if (reflection.comment.tags && dataObj[Constants.COMMENT][Constants.TAGS]) {
+            let targetTags = reflection.comment.tags;
+            if (this.customLocalization && targetTags.length > 0) {
+                let index = targetTags.findIndex(t => { return t.tagName === this.customLocalization.chooseTag; });
+                if (index >= 0) {
+                    // replace to shortText
+                    reflection.comment.shortText += `\n\n${targetTags[index].text}`;
+                    targetTags.splice(index, 1);
+
+                    // remove language tag
+                    let removeTags = this.customLocalization.removeTags;
+                    for (let i = 0; i < removeTags.length; i++) {
+                        index = targetTags.findIndex(t => { return t.tagName === removeTags[i]; });
+                        if (index < 0) continue;
+                        targetTags.splice(index, 1);
+                    }
+                    reflection.comment.tags = targetTags;
+                    console.log(`Replace language success: ${reflection.name}`);
+                }
+            }
+            let name = reflection.name;
+            let sourceFile = reflection.sources[0].fileName;
             reflection.comment.tags.forEach(tag => {
                 const tagFromJson = dataObj[Constants.COMMENT][Constants.TAGS][tag.tagName];
-                tag.tagName = tagFromJson[Constants.COMMENT].tagName;
-                tag.text = this.parser.joinByCharacter(tagFromJson[Constants.COMMENT].text, '\n');
+                tag.tagName = tagFromJson ? tagFromJson[Constants.COMMENT].tagName : tag.tagName;
+                tag.text = tagFromJson ? this.parser.joinByCharacter(tagFromJson[Constants.COMMENT].text, '\n') : 'lost!';
+                !tagFromJson && console.log(`render-component: ${sourceFile} : ${name}`)
                 return tag;
             });
         }
