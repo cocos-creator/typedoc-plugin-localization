@@ -57,12 +57,14 @@ export class RenderComponenet extends RendererComponent {
         const options = this.application.options.getRawValues();
         const localizeOpt = options[Constants.RENDER_OPTION];
         this.warns = options[Constants.WARNS];
+        // @ts-ignore
         if (!options.localize) {
             this.customLocalization = undefined;
             return;
         }
         else {
             let languageList = availableLanguages;
+            // @ts-ignore
             let chooseTag = languageList.splice(availableLanguages.indexOf(options.localize), 1);
             let removeTags = languageList;
             this.customLocalization = {
