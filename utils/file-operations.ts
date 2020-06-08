@@ -88,7 +88,19 @@ export class FileOperations {
 
     public getFileDir(filePath: string) {
         const parsedPath = path.parse(filePath);
-        return parsedPath.dir;
+        const splitPath = parsedPath.dir.split('/');
+        const [fileStructureDir, moduleDir, componentDir] = splitPath;
+        if (fileStructureDir === "" && moduleDir === undefined || parsedPath.root) {
+            return null;
+        }
+        else if (fileStructureDir && moduleDir === undefined) {
+            return fileStructureDir;
+        }
+        else if (fileStructureDir && moduleDir && componentDir) {
+            return path.join(fileStructureDir, moduleDir, componentDir);
+        }
+
+        return path.join(fileStructureDir, moduleDir);
     }
 
     public appendFileData(mainDir, filePath, fileName, extension, data) {
