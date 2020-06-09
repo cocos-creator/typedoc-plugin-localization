@@ -91,7 +91,7 @@ export class RenderComponenet extends RendererComponent {
             // 修正 enum 重名问题的命名重调整，保证最终 enum 名称正确。
             if (reflection.kind === ReflectionKind.Enum) reflection.name = reflection.name.split('_')[0];
             // external 名称缩减，美化 global 页面。这里只是简单的处理，主要是为了避免多 fork 一个 default-theme 仓库，建议后期修正。
-            // if (reflection.parent && reflection.parent.name) reflection.parent.name = path.parse(reflection.parent.name.match(/[a-zA-Z0-9\/\\]/g).join('')).name;
+            if (reflection.parent && reflection.parent.name) reflection.parent.name = path.parse(reflection.parent.name.match(/[a-zA-Z0-9\/\\]/g).join('')).name;
         });
     }
 
