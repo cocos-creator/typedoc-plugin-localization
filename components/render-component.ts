@@ -108,6 +108,10 @@ export class RenderComponenet extends RendererComponent {
                     }
                     this.data = this.fileOperations.getFileData(processedDir, reflection.name, 'json');
                     if (this.data) {
+                        if(!this.data[reflection.name]) {
+                            // 解决重名带来的大小写无法识别问题
+                            reflection.name = reflection.name.toLowerCase();
+                        }
                         this.updateComment(reflection, this.data[reflection.name]);
                     }
                 break;
